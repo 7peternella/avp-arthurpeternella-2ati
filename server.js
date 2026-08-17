@@ -3,6 +3,8 @@ import express from "express";
 const app = express();
 const port = 3000;
 
+app.use(express.json());
+
 const alunos = [
   { id: 1, nome: "Augusto", turma: "2TIB" },
   { id: 2, nome: "Gustavo", turma: "2TIB" },
@@ -38,6 +40,21 @@ app.get("/alunos/:id", (req, res) => {
   }
 
   res.json(aluno);
+});
+
+app.post("/alunos", (req, res) => {
+  const novoAluno = {
+    id: alunos.length + 1,
+    nome: req.body.nome,
+    turma: req.body.turma
+  };
+
+  alunos.push(novoAluno);
+
+  res.status(201).json({
+    mensagem: "Aluno cadastrado com sucesso",
+    aluno: novoAluno
+  });
 });
 
 app.listen(port, () => {
