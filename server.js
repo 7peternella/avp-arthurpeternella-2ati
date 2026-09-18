@@ -156,7 +156,7 @@ const swaggerDefinition = {
   },
   paths: {
     "/usuarios": { post: { summary: "Cadastrar usuário", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["nome", "email", "senha"], properties: { nome: { type: "string" }, email: { type: "string" }, senha: { type: "string", format: "password" } } } } } }, responses: { 201: { description: "Usuário cadastrado" }, 400: { description: "Dados inválidos" } } } },
-    "/login": { post: { summary: "Realizar login e obter token", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email", "senha"], properties: { email: { type: "string", format: "email" }, senha: { type: "string", format: "password" } } } } } }, responses: { 200: { description: "Token gerado" }, 401: { description: "Credenciais inválidas" } } } },
+    "/login": { post: { summary: "Realizar login e obter token", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email", "senha"], properties: { email: { type: "string", format: "email", example: "arthur@example.com" }, senha: { type: "string", format: "password", example: "123456" } }, example: { email: "arthur@example.com", senha: "123456" } } } } }, responses: { 200: { description: "Token gerado" }, 401: { description: "Credenciais inválidas" } } } },
     "/jogos": {
       get: { summary: "Listar jogos", security: [{ bearerAuth: [] }], responses: { 200: { description: "Lista de jogos" } } },
       post: { summary: "Cadastrar jogo", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: { "$ref": "#/components/schemas/Jogo" } } } }, responses: { 201: { description: "Jogo cadastrado" }, 400: { description: "Dados inválidos" } } }
@@ -164,10 +164,10 @@ const swaggerDefinition = {
     "/jogos/{id}": {
       parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
       get: { summary: "Consultar jogo", security: [{ bearerAuth: [] }], responses: { 200: { description: "Jogo encontrado" }, 404: { description: "Jogo não encontrado" } } },
-      put: { summary: "Editar jogo", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: { "$ref": "#/components/schemas/Jogo" } } } }, responses: { 200: { description: "Jogo atualizado" }, 400: { description: "Dados inválidos" } } },
+      put: { summary: "Editar jogo", security: [{ bearerAuth: [] }], requestBody: { required: true, description: "Informe os dados do jogo que serão atualizados. O id é enviado no parâmetro da rota.", content: { "application/json": { schema: { "$ref": "#/components/schemas/Jogo" }, example: { nome: "Stardew Valley 1.6", genero: "simulação", plataforma: "PC" } } } }, responses: { 200: { description: "Jogo atualizado" }, 400: { description: "Dados inválidos" } } },
       delete: { summary: "Excluir jogo", security: [{ bearerAuth: [] }], responses: { 200: { description: "Jogo excluído" }, 404: { description: "Jogo não encontrado" } } }
     },
-    "/upload": { post: { summary: "Enviar imagem", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "multipart/form-data": { schema: { type: "object", required: ["imagem"], properties: { imagem: { type: "string", format: "binary" } } } } } }, responses: { 201: { description: "Imagem salva" }, 400: { description: "Arquivo inválido" } } } }
+    "/upload": { post: { summary: "Enviar imagem", description: "Envie uma imagem JPEG, PNG ou WEBP de até 5 MB no campo obrigatório imagem.", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "multipart/form-data": { schema: { type: "object", required: ["imagem"], properties: { imagem: { type: "string", format: "binary", description: "Imagem JPEG, PNG ou WEBP de até 5 MB." } } } } } }, responses: { 201: { description: "Imagem salva" }, 400: { description: "Arquivo inexistente, tipo inválido ou arquivo maior que 5 MB" } } } }
   }
 };
 
