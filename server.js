@@ -5,14 +5,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import multer from "multer";
 import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
-const jwtSecret = process.env.JWT_SECRET || "chave-local-de-desenvolvimento";
 const maxFileSize = 5 * 1024 * 1024;
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const uploadDirectory = path.join(currentDirectory, "uploads");
@@ -20,29 +18,22 @@ const uploadDirectory = path.join(currentDirectory, "uploads");
 fs.mkdirSync(uploadDirectory, { recursive: true });
 app.use(express.json());
 
-const pets = [
-  { id: 1, nome: "Luna", especie: "cachorro", raca: "Vira-lata", idade: 3, adotado: false },
-  { id: 2, nome: "Milo", especie: "gato", raca: "Siamês", idade: 2, adotado: true }
-];
-let nextPetId = 3;
+const jogos = [];
 const usuarios = [];
 
 const sendValidationError = (res, message) => res.status(400).json({ mensagem: message });
 
 const authenticate = (req, res, next) => {
   const authorization = req.headers.authorization;
-  const [scheme, token] = authorization ? authorization.split(" ") : [];
+  const [scheme, token, extraPart] = authorization ? authorization.split(" ") : [];
 
-  if (scheme !== "Bearer" || !token) {
-    return res.status(401).json({ mensagem: "Token Bearer não informado" });
+  const usuario = usuarios.find((item) => item.token === token);
+  if (scheme !== "Bearer" || !token || extraPart || !usuario) {
+    return res.status(401).json({ mensagem: "Token ausente ou inválido" });
   }
 
-  try {
-    req.usuario = jwt.verify(token, jwtSecret);
-    next();
-  } catch {
-    res.status(401).json({ mensagem: "Token inválido ou expirado" });
-  }
+  req.usuario = usuario;
+  next();
 };
 
 const storage = multer.diskStorage({
@@ -57,16 +48,16 @@ const upload = multer({
   storage,
   limits: { fileSize: maxFileSize },
   fileFilter: (_req, file, callback) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.mimetype)) {
-      return callback(new Error("Apenas imagens JPEG, PNG, GIF ou WEBP são permitidas"));
+      return callback(new Error("Apenas imagens JPEG, PNG ou WEBP são permitidas"));
     }
     callback(null, true);
   }
 });
 
 app.get("/", (_req, res) => {
-  res.json({ mensagem: "API de cadastro de pets funcionando", documentacao: "/api-docs" });
+  res.json({ mensagem: "API de catálogo de jogos funcionando", documentacao: "/api-docs" });
 });
 
 app.post("/usuarios", async (req, res) => {
@@ -79,7 +70,7 @@ app.post("/usuarios", async (req, res) => {
   }
 
   const senhaHash = await bcrypt.hash(senha, 10);
-  usuarios.push({ id: usuarios.length + 1, nome, email: email.toLowerCase(), senhaHash });
+  usuarios.push({ id: crypto.randomUUID(), nome, email: email.toLowerCase(), senhaHash, token: null });
   res.status(201).json({ mensagem: "Usuário cadastrado com sucesso" });
 });
 
@@ -92,53 +83,48 @@ app.post("/login", async (req, res) => {
     return res.status(401).json({ mensagem: "Email ou senha inválidos" });
   }
 
-  const token = jwt.sign({ id: usuario.id, email: usuario.email }, jwtSecret, { expiresIn: "2h" });
+  const token = crypto.randomUUID();
+  usuario.token = token;
   res.json({ mensagem: "Login realizado com sucesso", token });
 });
 
-app.get("/pets", authenticate, (_req, res) => res.json(pets));
+app.get("/jogos", authenticate, (_req, res) => res.json(jogos));
 
-app.get("/pets/:id", authenticate, (req, res) => {
-  const pet = pets.find((item) => item.id === Number(req.params.id));
-  if (!pet) return res.status(404).json({ mensagem: "Pet não encontrado" });
-  res.json(pet);
+app.get("/jogos/:id", authenticate, (req, res) => {
+  const jogo = jogos.find((item) => item.id === req.params.id);
+  if (!jogo) return res.status(404).json({ mensagem: "Jogo não encontrado" });
+  res.json(jogo);
 });
 
-app.post("/pets", authenticate, (req, res) => {
-  const { nome, especie, raca, idade, adotado = false } = req.body;
-  if (!nome || !especie || !raca || idade === undefined) {
-    return sendValidationError(res, "Informe nome, espécie, raça e idade");
-  }
-  if (!Number.isInteger(Number(idade)) || Number(idade) < 0) {
-    return sendValidationError(res, "A idade deve ser um número inteiro não negativo");
+app.post("/jogos", authenticate, (req, res) => {
+  const { nome, genero, plataforma } = req.body;
+  if (!nome || !genero || !plataforma) {
+    return sendValidationError(res, "Informe nome, gênero e plataforma");
   }
 
-  const novoPet = { id: nextPetId++, nome, especie, raca, idade: Number(idade), adotado: Boolean(adotado) };
-  pets.push(novoPet);
-  res.status(201).json({ mensagem: "Pet cadastrado com sucesso", pet: novoPet });
+  const novoJogo = { id: crypto.randomUUID(), nome, genero, plataforma };
+  jogos.push(novoJogo);
+  res.status(201).json({ mensagem: "Jogo cadastrado com sucesso", jogo: novoJogo });
 });
 
-app.put("/pets/:id", authenticate, (req, res) => {
-  const pet = pets.find((item) => item.id === Number(req.params.id));
-  if (!pet) return res.status(404).json({ mensagem: "Pet não encontrado" });
+app.put("/jogos/:id", authenticate, (req, res) => {
+  const jogo = jogos.find((item) => item.id === req.params.id);
+  if (!jogo) return res.status(404).json({ mensagem: "Jogo não encontrado" });
 
-  const { nome, especie, raca, idade, adotado } = req.body;
-  if (!nome || !especie || !raca || idade === undefined) {
-    return sendValidationError(res, "Informe nome, espécie, raça e idade");
-  }
-  if (!Number.isInteger(Number(idade)) || Number(idade) < 0) {
-    return sendValidationError(res, "A idade deve ser um número inteiro não negativo");
+  const { nome, genero, plataforma } = req.body;
+  if (!nome || !genero || !plataforma) {
+    return sendValidationError(res, "Informe nome, gênero e plataforma");
   }
 
-  Object.assign(pet, { nome, especie, raca, idade: Number(idade), adotado: Boolean(adotado) });
-  res.json({ mensagem: "Pet atualizado com sucesso", pet });
+  Object.assign(jogo, { nome, genero, plataforma });
+  res.json({ mensagem: "Jogo atualizado com sucesso", jogo });
 });
 
-app.delete("/pets/:id", authenticate, (req, res) => {
-  const petIndex = pets.findIndex((item) => item.id === Number(req.params.id));
-  if (petIndex === -1) return res.status(404).json({ mensagem: "Pet não encontrado" });
-  pets.splice(petIndex, 1);
-  res.json({ mensagem: "Pet excluído com sucesso" });
+app.delete("/jogos/:id", authenticate, (req, res) => {
+  const jogoIndex = jogos.findIndex((item) => item.id === req.params.id);
+  if (jogoIndex === -1) return res.status(404).json({ mensagem: "Jogo não encontrado" });
+  jogos.splice(jogoIndex, 1);
+  res.json({ mensagem: "Jogo excluído com sucesso" });
 });
 
 app.post("/upload", authenticate, (req, res) => {
@@ -148,7 +134,7 @@ app.post("/upload", authenticate, (req, res) => {
     }
     if (error) return res.status(400).json({ mensagem: error.message });
     if (!req.file) return res.status(400).json({ mensagem: "Envie uma imagem no campo imagem" });
-    res.status(201).json({ mensagem: "Imagem enviada com sucesso", arquivo: `/uploads/${req.file.filename}` });
+    res.status(201).json({ mensagem: "Imagem enviada com sucesso", arquivo: req.file.filename });
   });
 });
 
@@ -156,38 +142,41 @@ app.use("/uploads", express.static(uploadDirectory));
 
 const swaggerDefinition = {
   openapi: "3.0.0",
-  info: { title: "API PetCare", version: "1.0.0", description: "API REST para cadastro de pets" },
+  info: { title: "API Catálogo de Jogos", version: "1.0.0", description: "API REST para catálogo de jogos" },
   servers: [{ url: `http://localhost:${port}` }],
   components: {
-    securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" } },
+    securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "Token" } },
     schemas: {
-      Pet: {
+      Jogo: {
         type: "object",
-        required: ["nome", "especie", "raca", "idade"],
-        properties: { id: { type: "integer" }, nome: { type: "string" }, especie: { type: "string" }, raca: { type: "string" }, idade: { type: "integer" }, adotado: { type: "boolean" } }
+        required: ["nome", "genero", "plataforma"],
+        properties: { id: { type: "string" }, nome: { type: "string" }, genero: { type: "string" }, plataforma: { type: "string" } }
       }
     }
   },
   paths: {
     "/usuarios": { post: { summary: "Cadastrar usuário", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["nome", "email", "senha"], properties: { nome: { type: "string" }, email: { type: "string" }, senha: { type: "string", format: "password" } } } } } }, responses: { 201: { description: "Usuário cadastrado" }, 400: { description: "Dados inválidos" } } } },
-    "/login": { post: { summary: "Realizar login e obter JWT", responses: { 200: { description: "Token gerado" }, 401: { description: "Credenciais inválidas" } } } },
-    "/pets": {
-      get: { summary: "Listar pets", security: [{ bearerAuth: [] }], responses: { 200: { description: "Lista de pets" } } },
-      post: { summary: "Cadastrar pet", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: { "$ref": "#/components/schemas/Pet" } } } }, responses: { 201: { description: "Pet cadastrado" } } }
+    "/login": { post: { summary: "Realizar login e obter token", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email", "senha"], properties: { email: { type: "string", format: "email" }, senha: { type: "string", format: "password" } } } } } }, responses: { 200: { description: "Token gerado" }, 401: { description: "Credenciais inválidas" } } } },
+    "/jogos": {
+      get: { summary: "Listar jogos", security: [{ bearerAuth: [] }], responses: { 200: { description: "Lista de jogos" } } },
+      post: { summary: "Cadastrar jogo", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: { "$ref": "#/components/schemas/Jogo" } } } }, responses: { 201: { description: "Jogo cadastrado" }, 400: { description: "Dados inválidos" } } }
     },
-    "/pets/{id}": {
-      parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
-      get: { summary: "Consultar pet", security: [{ bearerAuth: [] }], responses: { 200: { description: "Pet encontrado" }, 404: { description: "Pet não encontrado" } } },
-      put: { summary: "Editar pet", security: [{ bearerAuth: [] }], responses: { 200: { description: "Pet atualizado" } } },
-      delete: { summary: "Excluir pet", security: [{ bearerAuth: [] }], responses: { 200: { description: "Pet excluído" } } }
+    "/jogos/{id}": {
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      get: { summary: "Consultar jogo", security: [{ bearerAuth: [] }], responses: { 200: { description: "Jogo encontrado" }, 404: { description: "Jogo não encontrado" } } },
+      put: { summary: "Editar jogo", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: { "$ref": "#/components/schemas/Jogo" } } } }, responses: { 200: { description: "Jogo atualizado" }, 400: { description: "Dados inválidos" } } },
+      delete: { summary: "Excluir jogo", security: [{ bearerAuth: [] }], responses: { 200: { description: "Jogo excluído" }, 404: { description: "Jogo não encontrado" } } }
     },
-    "/upload": { post: { summary: "Enviar imagem", security: [{ bearerAuth: [] }], requestBody: { content: { "multipart/form-data": { schema: { type: "object", properties: { imagem: { type: "string", format: "binary" } } } } } }, responses: { 201: { description: "Imagem salva" } } } }
+    "/upload": { post: { summary: "Enviar imagem", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "multipart/form-data": { schema: { type: "object", required: ["imagem"], properties: { imagem: { type: "string", format: "binary" } } } } } }, responses: { 201: { description: "Imagem salva" }, 400: { description: "Arquivo inválido" } } } }
   }
 };
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerJSDoc({ definition: swaggerDefinition, apis: [] })));
 
 app.use((error, _req, res, _next) => {
+  if (error instanceof SyntaxError && error.status === 400) {
+    return res.status(400).json({ mensagem: "JSON inválido" });
+  }
   res.status(500).json({ mensagem: "Erro interno do servidor" });
 });
 
@@ -195,4 +184,4 @@ if (process.env.NODE_ENV !== "test") {
   app.listen(port, () => console.log(`Servidor rodando em http://localhost:${port}`));
 }
 
-export { app, pets, usuarios };
+export { app, jogos, usuarios };

@@ -1,42 +1,70 @@
-# API PetCare
+# Catálogo de Jogos
 
-API REST desenvolvida com Node.js e Express para o cadastro de pets. O projeto usa armazenamento em memória, portanto os dados são perdidos quando o servidor é encerrado.
+API REST simples para cadastrar e consultar jogos. O tema do projeto é um catálogo de jogos e os dados ficam em memória em arrays de objetos JavaScript. Ao reiniciar o servidor, os jogos e usuários cadastrados são perdidos.
 
-## Como executar
+## Tecnologias
+
+Node.js, Express, bcrypt, multer, swagger-jsdoc e swagger-ui-express.
+
+## Instalação e execução
 
 ```bash
 npm install
-cp .env.example .env
 npm start
 ```
 
-Servidor: `http://localhost:3000`  
-Documentação Swagger: `http://localhost:3000/api-docs`
+Para desenvolvimento, use `npm run dev`. O servidor utiliza a porta `3000` por padrão. É possível definir outra porta criando um `.env` baseado em `.env.example`.
 
-## Autenticação
+Swagger: http://localhost:3000/api-docs
 
-1. `POST /usuarios` com `{ "nome": "Arthur", "email": "arthur@example.com", "senha": "123456" }`.
-2. `POST /login` com email e senha.
-3. Copie o token retornado e use o cabeçalho `Authorization: Bearer TOKEN` nas rotas protegidas.
+## Usuário e login
 
-As senhas são armazenadas com hash bcrypt e nunca são retornadas pela API.
+Cadastre um usuário:
 
-## Rotas
+```http
+POST /usuarios
+Content-Type: application/json
+
+{"nome":"Arthur","email":"arthur@example.com","senha":"123456"}
+```
+
+A senha é salva somente com hash bcrypt. Depois, faça login:
+
+```http
+POST /login
+Content-Type: application/json
+
+{"email":"arthur@example.com","senha":"123456"}
+```
+
+Copie o `token` da resposta e envie `Authorization: Bearer TOKEN` nas rotas protegidas. O token é armazenado em memória.
+
+## Rotas principais
 
 | Método | Rota | Proteção | Função |
 | --- | --- | --- | --- |
 | POST | `/usuarios` | Não | Cadastra usuário |
-| POST | `/login` | Não | Gera token JWT |
-| GET | `/pets` | Bearer | Lista pets |
-| GET | `/pets/:id` | Bearer | Consulta um pet |
-| POST | `/pets` | Bearer | Cadastra pet |
-| PUT | `/pets/:id` | Bearer | Edita pet |
-| DELETE | `/pets/:id` | Bearer | Exclui pet |
+| POST | `/login` | Não | Gera token |
+| POST | `/jogos` | Bearer | Cadastra jogo |
+| GET | `/jogos` | Bearer | Lista jogos |
+| GET | `/jogos/:id` | Bearer | Consulta jogo |
+| PUT | `/jogos/:id` | Bearer | Edita jogo |
+| DELETE | `/jogos/:id` | Bearer | Exclui jogo |
 | POST | `/upload` | Bearer | Envia imagem no campo `imagem` |
-| GET | `/api-docs` | Não | Abre documentação Swagger |
+| GET | `/api-docs` | Não | Abre Swagger |
 
-O upload aceita somente JPEG, PNG, GIF ou WEBP com até 5 MB. Os arquivos são salvos localmente na pasta `uploads/`.
+Exemplo de jogo:
 
-## Demonstração no Insomnia
+```json
+{"nome":"Stardew Valley","genero":"simulação","plataforma":"PC"}
+```
 
-Teste primeiro o cadastro e o login. Depois faça uma requisição `GET /pets` sem o cabeçalho para demonstrar o bloqueio (`401`) e repita com o token para demonstrar o acesso. Em seguida, execute POST, GET por ID, PUT e DELETE. Para o upload, use `Multipart Form`, campo `imagem` do tipo arquivo.
+Depois do login, use o CRUD em `/jogos`. Os IDs são UUIDs, portanto não dependem do tamanho do array. O upload deve ser `multipart/form-data`, com o campo `imagem`, e aceita somente JPEG, PNG ou WEBP de até 5 MB. Os arquivos são salvos em `uploads/` com nomes únicos.
+
+## Testes no Insomnia
+
+1. Faça `POST /usuarios`.
+2. Faça `POST /login` e copie o token.
+3. Tente `GET /jogos` sem token para verificar o `401`.
+4. Repita com `Authorization: Bearer TOKEN` e teste POST, GET por ID, PUT e DELETE.
+5. Para upload, selecione `Multipart Form`, crie o campo de arquivo `imagem` e envie uma imagem permitida.
